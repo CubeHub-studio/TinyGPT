@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TinyGPT</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101010;color:#eee;font-family:Arial,sans-serif;height:100vh;display:flex;justify-content:center}
+#app{width:100%;max-width:720px;height:100vh;display:flex;flex-direction:column}
+header{padding:16px;background:#181818;border-bottom:1px solid #333}h1{margin:0;font-size:21px}header p{margin:5px 0 0;color:#aaa;font-size:13px}
+#status{padding:8px 16px;background:#141414;color:#8ab4ff;font-size:12px;border-bottom:1px solid #292929}
+#chat{flex:1;overflow-y:auto;padding:16px}.message{max-width:86%;padding:11px 14px;margin:0 0 10px;border-radius:13px;line-height:1.45;white-space:pre-wrap}.user{margin-left:auto;background:#315fce}.ai{background:#292929}
+#controls{display:flex;gap:8px;padding:8px 10px;background:#181818}button{border:0;border-radius:10px;padding:9px 13px;background:#333;color:#fff;cursor:pointer}button:hover{background:#444}
+#inputArea{display:flex;gap:8px;padding:10px;background:#181818;border-top:1px solid #333}#input{flex:1;min-width:0;padding:13px;border:0;border-radius:10px;background:#292929;color:#fff;outline:none;font-size:16px}
+#send{background:#315fce}#send:hover{background:#4272df}
+</style>
+</head>
+<body>
+<div id="app">
+<header><h1>🤖 TinyGPT</h1><p>Tiny local AI with basic math learning</p></header>
+<div id="status">Training...</div>
+<div id="chat"></div>
+<div id="controls"><button onclick="trainMore()">Train More</button><button onclick="showKnowledge()">Knowledge</button><button onclick="clearChat()">Clear Chat</button></div>
+<div id="inputArea"><input id="input" autocomplete="off" placeholder="Try: 12 × 8"><button id="send" onclick="send()">Send</button></div>
+</div>
+<script>
+const AI={examples:0,knowledge:{"+":{},"-":{},"*":{}, "/":{}}};
+function teach(a,o,b,r){AI.knowledge[o][a]??={};AI.knowledge[o][a][b]=r;AI.examples++}
+function train(){for(let a=0;a<=20;a++)for(let b=0;b<=20;b++){teach(a,"+",b,a+b);teach(a,"-",b,a-b);teach(a,"*",b,a*b)}for(let a=0;a<=100;a++)for(let b=1;b<=20;b++)if(a%b===0)teach(a,"/",b,a/b)}
+function trainMore(){let before=countKnowledge();for(let a=0;a<=100;a++)for(let b=0;b<=100;b++){teach(a,"+",b,a+b);teach(a,"-",b,a-b);teach(a,"*",b,a*b)}for(let a=0;a<=1000;a++)for(let b=1;b<=100;b++)if(a%b===0)teach(a,"/",b,a/b);updateStatus();addMessage("🧠 I trained on "+(countKnowledge()-before)+" additional math examples.","ai")}
+function countKnowledge(){let n=0;for(const o of Object.keys(AI.knowledge))for(const a in AI.knowledge[o])n+=Object.keys(AI.knowledge[o][a]).length;return n}
+function opNorm(o){return o==="×"||o==="x"||o==="X"||o==="*"?"*":o==="÷"||o===":"?"/":o}
+function parseMath(s){s=s.replace(/^(what is|calculate|solve)\s+/i,"").trim();const m=s.match(/^(-?\d+(?:\.\d+)?)\s*([+\-*×xX÷\/:])\s*(-?\d+(?:\.\d+)?)$/);return m?{a:Number(m[1]),o:opNorm(m[2]),b:Number(m[3])}:null}
+function predict(a,o,b){const known=AI.knowledge[o][a]?.[b];if(known!==undefined)return{r:known,learned:true};let r;if(o==="+")r=a+b;else if(o==="-")r=a-b;else if(o==="*")r=a*b;else if(o==="/"){if(b===0)return{error:"You cannot divide by zero."};r=a/b}else return{error:"Unknown operator."};teach(a,o,b,r);return{r,learned:false}}
+function fmt(n){return Number.isInteger(n)?String(n):Number(n.toFixed(10)).toString()}
+function send(){const input=document.getElementById("input"),s=input.value.trim();if(!s)return;input.value="";addMessage(s,"user");const m=parseMath(s);if(m){const q=predict(m.a,m.o,m.b);if(q.error){addMessage("❌ "+q.error,"ai");return}const sym=m.o==="*"?"×":m.o==="/"?"÷":m.o;addMessage((q.learned?"🧠 I learned this example before.\n\n":"🧠 I hadn't seen this exact example, so I calculated it and learned it.\n\n")+m.a+" "+sym+" "+m.b+" = "+fmt(q.r),"ai");updateStatus();return}const l=s.toLowerCase();if(/^(hi|hello|hey)\b/.test(l)){addMessage("Hello! 👋 I'm TinyGPT. Try a math problem like 7 × 8.","ai");return}if(l.includes("your name")){addMessage("I'm TinyGPT. 🤖","ai");return}if(l.includes("how are you")){addMessage("I'm running locally inside this HTML file!","ai");return}if(l.includes("what can you do")||l==="help"){addMessage("I can learn basic arithmetic:\n\n➕ Addition\n➖ Subtraction\n✖️ Multiplication\n➗ Division\n\nTry: 23 + 19, 50 - 17, 8 × 7, or 144 ÷ 12.","ai");return}addMessage("I don't understand that yet. Try a math problem such as 12 + 8.","ai")}
+function addMessage(t,type){const e=document.createElement("div");e.className="message "+type;e.textContent=t;document.getElementById("chat").appendChild(e);const c=document.getElementById("chat");c.scrollTop=c.scrollHeight}
+function updateStatus(){document.getElementById("status").textContent="🧠 Math knowledge: "+countKnowledge()+" examples"}
+function showKnowledge(){addMessage("🧠 Current math knowledge:\n\n➕ Addition\n➖ Subtraction\n✖️ Multiplication\n➗ Division\n\nStored examples: "+countKnowledge(),"ai")}
+function clearChat(){document.getElementById("chat").innerHTML="";addMessage("Chat cleared. My math knowledge is still here! 🧠","ai")}
+document.getElementById("input").addEventListener("keydown",e=>{if(e.key==="Enter")send()});
+train();updateStatus();addMessage("Hi! I'm TinyGPT. 🤖\n\nI've been trained on basic addition, subtraction, multiplication, and division.\n\nTry:\n5 + 7\n20 - 8\n6 × 9\n100 ÷ 4","ai");
+</script>
+</body>
+</html>
